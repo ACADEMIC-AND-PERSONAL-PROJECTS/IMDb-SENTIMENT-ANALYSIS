@@ -129,6 +129,30 @@ docker compose up --build -d        # rebuild after a change
 
 > If port `8088` is already taken by a local `uvicorn`, run `BACKEND_PORT=8090 docker compose up --build -d`. The frontend still works at `http://localhost:3000`: Nginx reaches the backend through the internal Docker network.
 
+### About the model weights
+
+The fine-tuned model (`outputs/models/imdb_bert/model.safetensors`, ~419 MB) exceeds
+GitHub's 100 MB per-file limit, so it is stored with **Git LFS**. Cloning with
+`git-lfs` installed pulls it automatically:
+
+```bash
+git clone https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/IMDb-SENTIMENT-ANALYSIS.git
+```
+
+If the file is still a small pointer after cloning (LFS not installed, or the free
+tier's 1 GB/month LFS bandwidth exhausted), fetch it from the
+[v1.0.0 release](https://github.com/ACADEMIC-AND-PERSONAL-PROJECTS/IMDb-SENTIMENT-ANALYSIS/releases/tag/v1.0.0)
+instead:
+
+```bash
+./scripts/fetch_model.sh
+```
+
+The script tries Git LFS first, then falls back to the release mirror, and verifies
+the SHA-256 checksum. `docker compose up --build` also handles this automatically:
+the image build downloads the weights from the release when the local file is an
+unresolved pointer.
+
 ### After changing the model
 
 The model is copied **into the backend image**, not mounted as a volume. After replacing `outputs/models/imdb_bert`:
@@ -273,7 +297,10 @@ The interface borrows the language of a projection booth: film leader, timecode,
 │   └── main.py                  # FastAPI API
 ├── backend/
 │   ├── Dockerfile               # API + model image
+│   ├── fetch_model.py           # downloads the model if the LFS pointer is unresolved
 │   └── requirements.txt
+├── scripts/
+│   └── fetch_model.sh           # local model fetch (Git LFS, then Release mirror)
 ├── frontend/
 │   ├── index.html
 │   ├── styles.css
@@ -286,6 +313,7 @@ The interface borrows the language of a projection booth: film leader, timecode,
 ├── assets/                      # Transformer / GPT / BERT diagrams
 ├── docs/                        # screenshots
 ├── outputs/models/imdb_bert/    # fine-tuned model (copied into the image)
+│                                 # model.safetensors is tracked with Git LFS
 ├── notebook.ipynb               # training and evaluation
 ├── notes.md                     # learning notes
 ├── docker-compose.yml
@@ -338,6 +366,8 @@ The `?api=` query parameter (or the `localStorage` key `cinescope.api`) points t
 | Backend stays in `starting` | Loading the model takes a few seconds. Wait for the healthcheck (up to 3 minutes). |
 | `API OFFLINE` in the frontend | Check `docker compose ps` and `docker compose logs backend`. |
 | First build is slow | PyTorch CPU and the model are baked into the image. Later builds use Docker's cache. |
+| `Model directory not found` or the backend crashes on startup | The model weights are in Git LFS. Run `./scripts/fetch_model.sh` (falls back to the release mirror) and rebuild. |
+| `safetensors` / `unexpected size` error when loading the model | The file is still an unresolved LFS pointer. Same fix: `./scripts/fetch_model.sh`. |
 | Out of memory | BERT-base uses about 450 MB of RAM; allow at least 2 GB free. |
 | Frontend does not update after a change | `docker compose build frontend && docker compose up -d frontend` — files are copied into the image. |
 | Browser shows another app (e.g. Excalidraw) at `localhost:3000` | A stale service worker from a previous app is controlling that origin. Open `http://127.0.0.1:3000` (different origin), or unregister it in DevTools → Application → Service Workers, then Clear site data and reload. |

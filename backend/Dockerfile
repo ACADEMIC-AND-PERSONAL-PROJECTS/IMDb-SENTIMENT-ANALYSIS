@@ -29,6 +29,16 @@ RUN useradd --create-home --uid 1000 appuser
 COPY --chown=appuser:appuser app ./app
 COPY --chown=appuser:appuser outputs/models/imdb_bert ./models/imdb_bert
 
+# The model weights are tracked with Git LFS. When the repository was cloned
+# without LFS (or LFS bandwidth was unavailable), model.safetensors is only a
+# ~134-byte pointer and the model cannot be loaded. fetch_model.py downloads
+# the real weights from the GitHub Release mirror in that case, and is a no-op
+# when the file is already present.
+COPY --chown=appuser:appuser backend/fetch_model.py ./fetch_model.py
+RUN python fetch_model.py \
+    && rm fetch_model.py \
+    && chown -R appuser:appuser /app/models
+
 USER appuser
 
 EXPOSE 8088
