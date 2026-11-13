@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cinéscope · Analyse de sentiment de critiques de films</title>
+  <meta name="description" content="Collez une critique de film : un BERT affiné sur IMDb mesure si elle penche vers l'éloge ou la démolition.">
+  <meta name="theme-color" content="#0a0807">
+  <meta name="color-scheme" content="dark">
+  <meta property="og:title" content="Cinéscope · Chaque critique a sa lumière">
+  <meta property="og:description" content="Un BERT affiné sur IMDb lit la température de vos critiques de films.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/bodoni-moda-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/archivo-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-i18n="skip">Aller au contenu</a>
+  <div class="grain" aria-hidden="true"></div>
+
+  <svg class="svg-sprite" aria-hidden="true" focusable="false">
+    <symbol id="icon-arrow" viewBox="0 0 20 20">
+      <path d="M3 10h13M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-reel" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <circle cx="16" cy="16" r="3.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <circle cx="16" cy="7.4" r="3.1" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      <circle cx="23.5" cy="20.3" r="3.1" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      <circle cx="8.5" cy="20.3" r="3.1" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    </symbol>
+    <symbol id="icon-info" viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      <path d="M8 7.1v4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+      <circle cx="8" cy="4.9" r=".75" fill="currentColor"/>
+    </symbol>
+    <symbol id="icon-retry" viewBox="0 0 20 20">
+      <path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.7V8h-4.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24">
+      <path d="M12 3.5 21 20H3L12 3.5Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M12 9v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="12" cy="17" r=".9" fill="currentColor"/>
+    </symbol>
+  </svg>
+
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="Cinéscope, accueil" data-i18n-aria-label="brand.label">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="20" cy="20" r="14.5" fill="none" stroke="currentColor" stroke-width=".6" opacity=".55"/>
+          <circle cx="20" cy="20" r="8.2" fill="none" stroke="currentColor" stroke-width=".8"/>
+          <circle cx="20" cy="20" r="2.1" fill="currentColor"/>
+          <circle cx="20" cy="12.6" r="2.5" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="26.4" cy="16.3" r="2.5" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="26.4" cy="23.7" r="2.5" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="20" cy="27.4" r="2.5" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="13.6" cy="23.7" r="2.5" fill="none" stroke="currentColor" stroke-width="1"/>
+          <circle cx="13.6" cy="16.3" r="2.5" fill="none" stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <span class="brand__name">Cinéscope</span>
+        <span class="brand__sub" data-i18n="brand.sub">Cabine de projection</span>
+      </span>
+    </a>
+
+    <div class="header-tools">
+      <button class="api-status" id="api-status" type="button" data-state="checking" title="Vérifier l'état de l'API" data-i18n-title="api.check">
+        <span class="api-status__dot" aria-hidden="true"></span>
+        <span class="api-status__label" id="api-status-label" data-i18n="api.checking">Vérification</span>
+      </button>
+      <div class="lang-switch" role="group" aria-label="Langue de l'interface" data-i18n-aria-label="lang.label">
+        <button type="button" data-lang="fr" aria-pressed="true">FR</button>
+        <span class="lang-switch__rule" aria-hidden="true"></span>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero__copy">
+        <h1 id="hero-title" data-i18n-html="hero.title">Chaque critique a sa <em>lumière</em>.</h1>
+        <p class="lede" data-i18n="hero.lede">Un BERT affiné sur 2&nbsp;000 critiques IMDb mesure la température de votre texte&nbsp;: éloge ou démolition. Collez, projetez, lisez.</p>
+
+        <form class="review-form" id="review-form" novalidate>
+          <div class="field-top">
+            <label for="review" data-i18n="form.label">Votre critique</label>
+            <span class="field-count" id="char-count">0 / 2&nbsp;000</span>
+          </div>
+          <textarea
+            id="review"
+            name="review"
+            rows="7"
+            maxlength="2000"
+            spellcheck="false"
+            placeholder="Collez ici une critique de film, en anglais de préférence…" data-i18n-placeholder="form.placeholder"
+            aria-describedby="model-note char-count"
+          ></textarea>
+          <p class="form-error" id="form-error" role="alert" hidden></p>
+          <div class="form-actions">
+            <p class="shortcut"><kbd>Ctrl</kbd><span aria-hidden="true">+</span><kbd data-i18n="form.enter">Entrée</kbd></p>
+            <button class="primary-button" id="submit-button" type="submit">
+              <span class="primary-button__label" id="submit-label" data-i18n="form.submit">Analyser la critique</span>
+              <span class="primary-button__spinner" aria-hidden="true"></span>
+              <svg class="icon icon--button" aria-hidden="true"><use href="#icon-arrow"></use></svg>
+            </button>
+          </div>
+        </form>
+
+        <p class="model-note" id="model-note">
+          <svg class="icon" aria-hidden="true"><use href="#icon-info"></use></svg>
+          <span data-i18n="note.model">Entraîné sur l'anglais. Écrivez dans cette langue pour un verdict fiable&nbsp;; 89&nbsp;% de précision en validation.</span>
+        </p>
+      </div>
+
+      <aside class="screen-panel" aria-labelledby="screen-title">
+        <div class="panel-bar">
+          <span class="panel-bar__label" id="screen-title" data-i18n="screen.label">Écran de projection</span>
+          <span class="panel-bar__tc"><span class="tc-label">TC</span><span id="timecode">00:00:00:00</span></span>
+        </div>
+
+        <div class="screen" id="screen" data-state="idle" data-sentiment="" aria-busy="false">
+          <span class="screen__glow" aria-hidden="true"></span>
+          <span class="screen__grain" aria-hidden="true"></span>
+          <span class="screen__vignette" aria-hidden="true"></span>
+          <span class="reg reg--tl" aria-hidden="true"></span>
+          <span class="reg reg--tr" aria-hidden="true"></span>
+          <span class="reg reg--bl" aria-hidden="true"></span>
+          <span class="reg reg--br" aria-hidden="true"></span>
+
+          <div class="screen__state screen__idle" data-screen="idle">
+            <div class="leader" aria-hidden="true">
+              <svg class="leader__rings" viewBox="0 0 220 220">
+                <circle cx="110" cy="110" r="104" fill="none" stroke="currentColor" stroke-width=".7" opacity=".38"/>
+                <circle cx="110" cy="110" r="86" fill="none" stroke="currentColor" stroke-width=".7" opacity=".22" stroke-dasharray="2 7"/>
+                <circle cx="110" cy="110" r="62" fill="none" stroke="currentColor" stroke-width=".7" opacity=".28"/>
+                <path d="M110 3v22M110 195v22M3 110h22M195 110h22" stroke="currentColor" stroke-width=".7" opacity=".45"/>
+              </svg>
+              <span class="leader__number">3</span>
+              <span class="leader__caption">LEADER</span>
+            </div>
+            <p class="screen__title" data-i18n="idle.title">En attente d'une critique</p>
+            <p class="screen__sub" data-i18n="idle.sub">La pellicule est prête. Chargez un texte à gauche.</p>
+          </div>
+
+          <div class="screen__state screen__loading" data-screen="loading" hidden>
+            <div class="leader leader--running" aria-hidden="true">
+              <svg class="leader__rings leader__rings--spin" viewBox="0 0 220 220">
+                <circle cx="110" cy="110" r="104" fill="none" stroke="currentColor" stroke-width=".7" opacity=".38"/>
+                <circle cx="110" cy="110" r="86" fill="none" stroke="currentColor" stroke-width="1" opacity=".5" stroke-dasharray="1 11"/>
+                <circle cx="110" cy="110" r="62" fill="none" stroke="currentColor" stroke-width=".7" opacity=".28"/>
+                <path d="M110 3v22M110 195v22M3 110h22M195 110h22" stroke="currentColor" stroke-width=".7" opacity=".45"/>
+              </svg>
+              <span class="leader__number" id="countdown">3</span>
+              <span class="leader__caption">PROJECTION</span>
+            </div>
+            <p class="screen__title" data-i18n="loading.title">Projection en cours</p>
+            <p class="screen__sub" id="loading-sub">Lecture des 0 mots…</p>
+          </div>
+
+          <div class="screen__state screen__result" data-screen="result" hidden>
+            <div class="result__top">
+              <span class="result__label" data-i18n="result.label">Verdict</span>
+              <span class="result__temp" id="result-temp">–</span>
+            </div>
+            <h2 class="verdict" id="verdict">–</h2>
+            <p class="confidence"><span id="confidence">0</span><span class="confidence__unit">%</span> <span class="confidence__text" data-i18n="result.confidence">de certitude</span></p>
+            <p class="result__copy" id="result-copy">–</p>
+          </div>
+
+          <div class="screen__state screen__error" data-screen="error" hidden>
+            <svg class="error-icon" aria-hidden="true"><use href="#icon-alert"></use></svg>
+            <p class="screen__title" id="error-title" data-i18n="error.title">La cabine ne répond pas</p>
+            <p class="screen__sub" id="error-copy" data-i18n="error.copy">Vérifiez que l'API est démarrée, puis réessayez.</p>
+            <button class="ghost-button" id="retry-button" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#icon-retry"></use></svg>
+              <span data-i18n="error.retry">Réessayer</span>
+            </button>
+          </div>
+
+          <span class="scanline" aria-hidden="true"></span>
+        </div>
+
+        <div class="readout">
+          <div class="readout__head">
+            <span data-i18n="readout.label">Lecture du modèle</span>
+            <span class="readout__latency"><span id="latency">–</span> ms</span>
+          </div>
+
+          <div class="meter" data-tone="positive">
+            <div class="meter__row">
+              <span class="meter__name" data-i18n="meter.positive">Positif</span>
+              <span class="meter__value" id="prob-positive">–</span>
+            </div>
+            <div class="meter__track"><span class="meter__fill" id="bar-positive"></span></div>
+          </div>
+
+          <div class="meter" data-tone="negative">
+            <div class="meter__row">
+              <span class="meter__name" data-i18n="meter.negative">Négatif</span>
+              <span class="meter__value" id="prob-negative">–</span>
+            </div>
+            <div class="meter__track"><span class="meter__fill" id="bar-negative"></span></div>
+          </div>
+
+          <dl class="stats">
+            <div><dt data-i18n="stats.words">Mots</dt><dd id="stat-words">–</dd></div>
+            <div><dt data-i18n="stats.chars">Caractères</dt><dd id="stat-chars">–</dd></div>
+            <div><dt data-i18n="stats.model">Modèle</dt><dd>BERT</dd></div>
+          </dl>
+        </div>
+      </aside>
+    </section>
+
+    <section class="samples" aria-labelledby="samples-title">
+      <div class="section-head">
+        <div>
+          <h2 id="samples-title" data-i18n="samples.title">Bandes-annonces</h2>
+          <p data-i18n="samples.lede">Trois critiques pour tester la cabine sans écrire une ligne.</p>
+        </div>
+        <p class="section-meta" lang="en" data-i18n="samples.meta">Fictional samples · English</p>
+      </div>
+
+      <div class="sample-grid">
+        <button class="sample" type="button" data-sample="0" data-review="I went in with no expectations and came out grinning. The performances are tender, the photography is patient, and the final scene has stayed with me for days. A small, generous film.">
+          <blockquote class="sample__quote" lang="en">“I went in with no expectations and came out grinning. The performances are tender, the photography is patient, and the final scene has stayed with me for days.”</blockquote>
+          <span class="sample__foot">
+            <span data-i18n="samples.load">Charger l'exemple</span>
+            <svg class="icon" aria-hidden="true"><use href="#icon-arrow"></use></svg>
+          </span>
+        </button>
+
+        <button class="sample" type="button" data-sample="1" data-review="Two hours of beautiful people explaining the plot to each other. The score never stops, the jokes land with a thud, and by the third act I was checking the exit signs. A waste of a great cast.">
+          <blockquote class="sample__quote" lang="en">“Two hours of beautiful people explaining the plot to each other. The score never stops, the jokes land with a thud, and by the third act I was checking the exit signs.”</blockquote>
+          <span class="sample__foot">
+            <span data-i18n="samples.load">Charger l'exemple</span>
+            <svg class="icon" aria-hidden="true"><use href="#icon-arrow"></use></svg>
+          </span>
+        </button>
+
+        <button class="sample" type="button" data-sample="2" data-review="The first hour is genuinely gripping, but the film loses its nerve halfway through and trades its sharp ideas for a loud, predictable finale. I wanted to love it more than I did.">
+          <blockquote class="sample__quote" lang="en">“The first hour is genuinely gripping, but the film loses its nerve halfway through and trades its sharp ideas for a loud, predictable finale.”</blockquote>
+          <span class="sample__foot">
+            <span data-i18n="samples.load">Charger l'exemple</span>
+            <svg class="icon" aria-hidden="true"><use href="#icon-arrow"></use></svg>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <section class="log" aria-labelledby="log-title">
+      <div class="section-head">
+        <div>
+          <h2 id="log-title" data-i18n="log.title">Registre des séances</h2>
+          <p data-i18n="log.lede">Les huit dernières projections, conservées dans ce navigateur.</p>
+        </div>
+        <button class="text-button" id="clear-log" type="button" hidden data-i18n="log.clear">Effacer le registre</button>
+      </div>
+
+      <div class="log__body">
+        <ol class="log__list" id="log-list"></ol>
+        <div class="log__empty" id="log-empty">
+          <svg class="log__empty-icon" aria-hidden="true"><use href="#icon-reel"></use></svg>
+          <p data-i18n="log.empty.title">Le registre est vierge.</p>
+          <p class="log__empty-sub" data-i18n="log.empty.sub">Chaque analyse viendra s'y inscrire avec son heure, son verdict et sa certitude.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p data-i18n-html="footer.credit">Cinéscope · BERT-base affiné sur <a href="https://huggingface.co/datasets/stanfordnlp/imdb" target="_blank" rel="noreferrer">IMDb</a>. Interface HTML/CSS/JS, API FastAPI.</p>
+    <nav aria-label="Liens techniques">
+      <a href="/docs" data-i18n="footer.docs">Documentation API</a>
+      <a href="/api/health" data-i18n="footer.health">Santé de l'API</a>
+    </nav>
+  </footer>
+
+  <p class="sr-only" id="live-status" role="status" aria-live="polite"></p>
+
+  <noscript>
+    <p class="noscript" data-i18n="noscript">Cette cabine a besoin de JavaScript pour projeter un verdict.</p>
+  </noscript>
+</body>
+</html>

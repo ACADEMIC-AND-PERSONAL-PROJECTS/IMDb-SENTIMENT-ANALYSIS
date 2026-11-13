@@ -1,0 +1,7 @@
+# Runtime dependencies for the FastAPI inference service.
+# torch is installed separately from the CPU wheel index in the Dockerfile.
+fastapi==0.162.5
+uvicorn[standard]==0.54.0
+transformers==5.22.2
+tokenizers==0.23.3
+safetensors==0.8.0

@@ -1,0 +1,25 @@
+# Heavy or irrelevant for the backend build context
+.venv/
+.git/
+.gitignore
+.github/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+bert_imdb_output/
+notebook.ipynb
+notes.md
+README.md
+uv.lock
+pyproject.toml
+.python-version
+
+# Local tools, editor and test artefacts
+.chrome-tmp/
+.chrome-cdp/
+.impeccable/
+frontend/
+backend/README.md
+.env
+.env.*
+*.log

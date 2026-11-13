@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local environment
+.env
+
+# Local Docker/build tooling
+.docker/
+
+# Visual QA and browser test artefacts
+.impeccable/
+.chrome-*/
+
+# Training checkpoints — regenerate by re-running notebook.ipynb.
+# They are ~2.5 GB and cannot be pushed to GitHub (100 MB per-file limit).
+bert_imdb_output/
