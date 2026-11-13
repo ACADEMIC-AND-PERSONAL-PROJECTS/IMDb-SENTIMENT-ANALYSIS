@@ -166,7 +166,7 @@ docker compose up -d
 
 ```text
 ┌────────────────────┐        /api/*         ┌─────────────────────┐
-│  Browser           │ ────────────────────▶│  Nginx (frontend)   │
+│  Browser           │ ────────────────────▶ │  Nginx (frontend)   │
 │  HTML / CSS / JS   │                       │  :3000 → :80        │
 └────────────────────┘                       └──────────┬──────────┘
                                                       │ internal proxy
